@@ -7,12 +7,16 @@ import 'package:path/path.dart' as path;
 import 'package:webview_cookie_manager/webview_cookie_manager.dart';
 
 class InstdApi {
+  static const String USER_AGENT =
+      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/86.0.4240.75 Safari/537.36";
+
   final Dio _dio;
   factory InstdApi() {
     if (_instance == null) {
-      Dio dio = Dio();
+      Dio dio = Dio(BaseOptions(headers: {
+        HttpHeaders.userAgentHeader: USER_AGENT,
+      }));
       dio.interceptors.add(_AuthenticationInterceptor());
-      dio.interceptors.add(_UserAgentInterceptor());
       _instance = InstdApi._(dio);
     }
     return _instance;
@@ -139,16 +143,6 @@ class AuthenticationException implements Exception {}
 class ResourceNotFoundException implements Exception {
   final ParsedUrl parsedUrl;
   ResourceNotFoundException(this.parsedUrl);
-}
-
-class _UserAgentInterceptor extends Interceptor {
-  static const String USER_AGENT =
-      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/86.0.4240.75 Safari/537.36";
-
-  @override
-  Future onRequest(RequestOptions options) async {
-    options.headers[HttpHeaders.userAgentHeader] = USER_AGENT;
-  }
 }
 
 class _AuthenticationInterceptor extends Interceptor {

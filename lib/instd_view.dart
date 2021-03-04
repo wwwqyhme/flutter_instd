@@ -2,23 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import 'links_provider.dart';
-import 'permission.dart';
+import 'util.dart';
 
-class InstdGridView extends StatefulWidget {
-  @override
-  State<StatefulWidget> createState() {
-    return _InstdGridViewState();
-  }
-}
-
-class _InstdGridViewState extends State<InstdGridView> {
-  final SliverGridDelegate _gridViewDelegate =
-      SliverGridDelegateWithFixedCrossAxisCount(
-          crossAxisCount: 3,
-          mainAxisSpacing: 1,
-          crossAxisSpacing: 1,
-          childAspectRatio: 1);
-
+class InstdGridView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Consumer<DownloadableLinksProvider>(
@@ -26,12 +12,17 @@ class _InstdGridViewState extends State<InstdGridView> {
       int size = provider.size;
       List<DownloadableLink> links = provider.items;
       return GridView.builder(
-          gridDelegate: _gridViewDelegate,
+          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 3,
+              mainAxisSpacing: 1,
+              crossAxisSpacing: 1,
+              childAspectRatio: 1),
           itemCount: size,
           itemBuilder: (context, index) {
             if (index >= size) return null;
             DownloadableLink downloadableLink = links[index];
             return GestureDetector(
+                key: Key(downloadableLink.link.url),
                 child: Stack(
                     alignment: AlignmentDirectional.bottomEnd,
                     children: <Widget>[
@@ -100,35 +91,35 @@ class _InstdGridViewState extends State<InstdGridView> {
   }
 }
 
-typedef StatusWidgetBuilder = Widget Function(DownloadableLink link);
+typedef _StatusWidgetBuilder = Widget Function(DownloadableLink link);
 
 class _StatusWidget extends StatefulWidget {
-  final DownloadableLink _link;
-  final StatusWidgetBuilder _builder;
-  _StatusWidget(this._link, this._builder);
+  final DownloadableLink link;
+  final _StatusWidgetBuilder builder;
+  _StatusWidget(this.link, this.builder);
   @override
   State<StatefulWidget> createState() => _StatusWidgetState();
 }
 
 class _StatusWidgetState extends State<_StatusWidget> {
-  void _listener() {
-    if (mounted) setState(() {});
+  void listener() {
+    setState(() {});
   }
 
   @override
   void initState() {
     super.initState();
-    widget._link.addListener(_listener);
+    widget.link.addListener(listener);
   }
 
   @override
   void dispose() {
     super.dispose();
-    widget._link.removeListener(_listener);
+    widget.link.removeListener(listener);
   }
 
   @override
   Widget build(BuildContext context) {
-    return widget._builder(widget._link);
+    return widget.builder(widget.link);
   }
 }

@@ -10,7 +10,7 @@ import 'package:flutter/foundation.dart';
 
 import 'instd_login.dart';
 import 'instd_api.dart';
-import 'permission.dart';
+import 'util.dart';
 
 void main() {
   runApp(MyApp());
@@ -40,14 +40,14 @@ class MyHomePage extends StatefulWidget {
 }
 
 class _MyHomePageState extends State<MyHomePage> {
-  var _controller = TextEditingController();
-  String _lastUrl;
-  bool _deleteAfterDownloadComplete = false;
+  var controller = TextEditingController();
+  String lastUrl;
+  bool deleteAfterDownloadComplete = false;
 
   @override
   void dispose() {
     super.dispose();
-    _controller.dispose();
+    controller.dispose();
   }
 
   @override
@@ -61,14 +61,14 @@ class _MyHomePageState extends State<MyHomePage> {
           create: (context) => DownloadableLinksProvider(),
           child: Column(children: <Widget>[
             _ClipboardReadWidget((context, data) {
-              if (data != _lastUrl) _parse(context, data);
+              if (data != lastUrl) parse(context, data);
             }),
             Container(
               child: Padding(
                 padding: EdgeInsets.only(left: 20, right: 20, bottom: 10),
                 child: Builder(builder: (context) {
-                  return _ClearableTextField(_controller, (value) {
-                    _parse(context, value);
+                  return _ClearableTextField(controller, (value) {
+                    parse(context, value);
                   });
                 }),
               ),
@@ -82,9 +82,9 @@ class _MyHomePageState extends State<MyHomePage> {
                       Text('下载完成后从界面删除'),
                       Builder(builder: (context) {
                         return Checkbox(
-                          value: _deleteAfterDownloadComplete,
+                          value: deleteAfterDownloadComplete,
                           onChanged: (value) {
-                            _deleteAfterDownloadComplete = value;
+                            deleteAfterDownloadComplete = value;
                             if (!provider.setDeleteAfterComplete(value)) {
                               (context as Element).markNeedsBuild();
                             }
@@ -117,11 +117,11 @@ class _MyHomePageState extends State<MyHomePage> {
     );
   }
 
-  void _parse(BuildContext context, String url) {
+  void parse(BuildContext context, String url) {
     ParsedUrl parsedUrl = InstdApi.parseUrl(url);
     if (parsedUrl == null) {
-      _controller.text = '';
-      _alertError('无效的地址');
+      controller.text = '';
+      alertError('无效的地址');
       return;
     }
     AlertDialog alert = AlertDialog(
@@ -140,32 +140,32 @@ class _MyHomePageState extends State<MyHomePage> {
         return WillPopScope(onWillPop: () async => false, child: alert);
       },
     );
-    _lastUrl = url;
+    lastUrl = url;
     InstdApi().parse(url).then((value) {
       Navigator.pop(context);
-      _controller.text = '';
+      controller.text = '';
       Provider.of<DownloadableLinksProvider>(context, listen: false).add(value);
     }).catchError((e) {
       Navigator.pop(context);
       if (e is DioError) {
-        _alertError('网络异常');
+        alertError('网络异常');
       } else if (e is ResourceNotFoundException) {
         String message = '帖子不存在';
-        _alertError(message);
+        alertError(message);
       } else if (e is AuthenticationException) {
         Navigator.pushNamed(context, "login").then((value) {
           if (value != true)
-            _alertError('登录失败');
-          else if (_lastUrl != null) _parse(context, _lastUrl);
+            alertError('登录失败');
+          else if (lastUrl != null) parse(context, lastUrl);
         });
       } else {
-        _alertError('系统异常');
+        alertError('系统异常');
         debugPrint(e.toString());
       }
     });
   }
 
-  void _alertError(String message) {
+  void alertError(String message) {
     AlertDialog alert = AlertDialog(
       content: Row(
         children: [
@@ -183,30 +183,31 @@ class _MyHomePageState extends State<MyHomePage> {
   }
 }
 
-typedef ClipbardDataCallback = void Function(BuildContext context, String data);
+typedef _ClipbardDataCallback = void Function(
+    BuildContext context, String data);
 
 class _ClipboardReadWidget extends StatefulWidget {
-  final ClipbardDataCallback _callback;
-  _ClipboardReadWidget(this._callback);
+  final _ClipbardDataCallback callback;
+  _ClipboardReadWidget(this.callback);
   @override
   State<StatefulWidget> createState() => _ClipboardReadWidgetState();
 }
 
 class _ClipboardReadWidgetState extends State<_ClipboardReadWidget>
     with WidgetsBindingObserver {
-  var _focusNode = FocusNode();
+  FocusNode focusNode;
 
-  void _focusListener() async {
-    if (_focusNode.hasFocus) {
-      _readFromClipboard();
+  void focusListener() async {
+    if (focusNode.hasFocus) {
+      readFromClipboard();
     }
   }
 
-  Future<bool> _readFromClipboard() async {
+  Future<bool> readFromClipboard() async {
     ClipboardData clipboardData = await Clipboard.getData(Clipboard.kTextPlain);
     if (clipboardData != null) {
       if (InstdApi.parseUrl(clipboardData.text) != null)
-        widget._callback(context, clipboardData.text);
+        widget.callback(context, clipboardData.text);
       return true;
     }
     return false;
@@ -216,25 +217,26 @@ class _ClipboardReadWidgetState extends State<_ClipboardReadWidget>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    _focusNode.addListener(_focusListener);
+    focusNode = FocusNode();
+    focusNode.addListener(focusListener);
   }
 
   @override
   void dispose() {
     super.dispose();
     WidgetsBinding.instance.removeObserver(this);
-    _focusNode.removeListener(_focusListener);
+    focusNode.dispose();
   }
 
   @override
   Future<void> didChangeAppLifecycleState(AppLifecycleState state) async {
     if (state == AppLifecycleState.resumed) {
-      if (!await _readFromClipboard()) {
-        FocusScope.of(context).requestFocus(_focusNode);
+      if (!await readFromClipboard()) {
+        FocusScope.of(context).requestFocus(focusNode);
       }
     }
     if (state == AppLifecycleState.inactive) {
-      _focusNode.unfocus();
+      focusNode.unfocus();
     }
   }
 
@@ -243,60 +245,58 @@ class _ClipboardReadWidgetState extends State<_ClipboardReadWidget>
 }
 
 class _ClearableTextField extends StatefulWidget {
-  final TextEditingController _controller;
-  final ValueChanged<String> _onSubmitted;
+  final TextEditingController controller;
+  final ValueChanged<String> onSubmitted;
 
-  _ClearableTextField(this._controller, this._onSubmitted);
+  _ClearableTextField(this.controller, this.onSubmitted);
 
   @override
-  State<StatefulWidget> createState() {
-    return _ClearableTextFieldState();
-  }
+  State<StatefulWidget> createState() => _ClearableTextFieldState();
 }
 
 class _ClearableTextFieldState extends State<_ClearableTextField> {
-  bool _visible = false;
+  bool visible = false;
 
-  void _changeListener() {
+  void changeListener() {
     setState(() {
-      _visible = widget._controller.text != '';
+      visible = widget.controller.text != '';
     });
   }
 
   @override
   void initState() {
     super.initState();
-    widget._controller.addListener(_changeListener);
+    widget.controller.addListener(changeListener);
   }
 
   @override
   void dispose() {
     super.dispose();
-    widget._controller.removeListener(_changeListener);
+    widget.controller.removeListener(changeListener);
   }
 
   @override
   Widget build(BuildContext context) {
     return TextField(
-        controller: widget._controller,
+        controller: widget.controller,
         autofocus: true,
         decoration: InputDecoration(
           labelText: '地址',
           suffixIcon: Visibility(
-              visible: _visible,
+              visible: visible,
               child: IconButton(
                 splashColor: Colors.transparent,
                 highlightColor: Colors.transparent,
                 padding: EdgeInsets.only(top: 15),
                 onPressed: () {
-                  widget._controller.text = '';
+                  widget.controller.text = '';
                   setState(() {
-                    _visible = false;
+                    visible = false;
                   });
                 },
                 icon: Icon(Icons.clear),
               )),
         ),
-        onSubmitted: widget._onSubmitted);
+        onSubmitted: widget.onSubmitted);
   }
 }

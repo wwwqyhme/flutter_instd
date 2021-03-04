@@ -31,12 +31,12 @@ class DownloadableLinksProvider extends ChangeNotifier {
       if (!_contain(link)) {
         notify = true;
         DownloadableLink downloadableLink = DownloadableLink(link);
-        downloadableLink._completeListener = () {
-          if (_deleteAfterComplete) {
+        downloadableLink.addListener(() {
+          if (_deleteAfterComplete && downloadableLink.isComplete) {
             _links.remove(downloadableLink);
             notifyListeners();
           }
-        };
+        });
         _links.add(downloadableLink);
       }
     }
@@ -79,7 +79,6 @@ class DownloadableLink extends ChangeNotifier with EquatableMixin {
   double percent = -1;
 
   CancelToken _cancelToken;
-  VoidCallback _completeListener;
   DownloadableLink(this.link);
 
   void start() {
@@ -107,7 +106,6 @@ class DownloadableLink extends ChangeNotifier with EquatableMixin {
               this.isFail = false;
               this.percent = 100;
               this._cancelToken = null;
-              if (_completeListener != null) _completeListener();
             }))
         .then((value) => notifyListeners())
         .catchError((e) => _markFailStatus(e));
