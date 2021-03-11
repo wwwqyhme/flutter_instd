@@ -195,14 +195,6 @@ class _ClipboardReadWidget extends StatefulWidget {
 
 class _ClipboardReadWidgetState extends State<_ClipboardReadWidget>
     with WidgetsBindingObserver {
-  FocusNode focusNode;
-
-  void focusListener() async {
-    if (focusNode.hasFocus) {
-      readFromClipboard();
-    }
-  }
-
   Future<bool> readFromClipboard() async {
     ClipboardData clipboardData = await Clipboard.getData(Clipboard.kTextPlain);
     if (clipboardData != null) {
@@ -216,32 +208,47 @@ class _ClipboardReadWidgetState extends State<_ClipboardReadWidget>
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addObserver(this);
-    focusNode = FocusNode();
-    focusNode.addListener(focusListener);
+    if (defaultTargetPlatform == TargetPlatform.android) {
+      const MethodChannel windowsFocusChangedChannel =
+          const MethodChannel('plugins.flutter.io/windowFocusChangedListener');
+      windowsFocusChangedChannel.setMethodCallHandler(_onMethodCall);
+    } else {
+      WidgetsBinding.instance.addObserver(this);
+    }
   }
 
   @override
   void dispose() {
     super.dispose();
-    WidgetsBinding.instance.removeObserver(this);
-    focusNode.dispose();
+    if (defaultTargetPlatform != TargetPlatform.android) {
+      WidgetsBinding.instance.removeObserver(this);
+    }
   }
 
   @override
   Future<void> didChangeAppLifecycleState(AppLifecycleState state) async {
     if (state == AppLifecycleState.resumed) {
-      if (!await readFromClipboard()) {
-        FocusScope.of(context).requestFocus(focusNode);
-      }
-    }
-    if (state == AppLifecycleState.inactive) {
-      focusNode.unfocus();
+      readFromClipboard();
     }
   }
 
   @override
   Widget build(BuildContext context) => SizedBox.shrink();
+
+  Future<bool> _onMethodCall(MethodCall call) async {
+    switch (call.method) {
+      case 'onWindowFocusChanged':
+        bool focused = call.arguments;
+        if (focused) {
+          readFromClipboard();
+        }
+        return true;
+    }
+
+    throw MissingPluginException(
+      '${call.method} was invoked but has no handler',
+    );
+  }
 }
 
 class _ClearableTextField extends StatefulWidget {
