@@ -95,7 +95,7 @@ class _MyHomePageState extends State<MyHomePage> {
                       Builder(builder: (context) {
                         return TextButton(
                           onPressed: () async {
-                            if (await requestStoragePermission(context)) {
+                            if (await Util.requestStoragePermission(context)) {
                               provider.downloadAll();
                             }
                           },
@@ -121,65 +121,31 @@ class _MyHomePageState extends State<MyHomePage> {
     ParsedUrl parsedUrl = InstdApi.parseUrl(url);
     if (parsedUrl == null) {
       controller.text = '';
-      alertError('无效的地址');
+      Util.alertError(context, '无效的地址');
       return;
     }
-    AlertDialog alert = AlertDialog(
-      content: Row(
-        children: [
-          CircularProgressIndicator(),
-          Container(
-              margin: EdgeInsets.only(left: 7), child: Text("正在获取图片|视频...")),
-        ],
-      ),
-    );
-    showDialog(
-      barrierDismissible: false,
-      context: context,
-      builder: (BuildContext context) {
-        return WillPopScope(onWillPop: () async => false, child: alert);
-      },
-    );
+    Util.loadingDialog(context, message: '正在获取图片|视频...');
     lastUrl = url;
     InstdApi().parse(url).then((value) {
-      Navigator.pop(context);
       controller.text = '';
       Provider.of<DownloadableLinksProvider>(context, listen: false).add(value);
     }).catchError((e) {
-      Navigator.pop(context);
       if (e is DioError) {
-        alertError('网络异常');
+        Util.alertError(context, '网络异常');
       } else if (e is ResourceNotFoundException) {
-        String message = '帖子不存在';
-        alertError(message);
+        Util.alertError(context, '帖子不存在');
       } else if (e is AuthenticationException) {
+        Util.closeLoadingDialogIfNotClosed(context);
         Navigator.pushNamed(context, "login").then((value) {
           if (value != true)
-            alertError('登录失败');
+            Util.alertError(context, '登录失败');
           else if (lastUrl != null) parse(context, lastUrl);
         });
       } else {
-        alertError('系统异常');
+        Util.alertError(context, '系统异常');
         debugPrint(e.toString());
       }
-    });
-  }
-
-  void alertError(String message) {
-    AlertDialog alert = AlertDialog(
-      content: Row(
-        children: [
-          Icon(Icons.error),
-          Container(margin: EdgeInsets.only(left: 7), child: Text(message)),
-        ],
-      ),
-    );
-    showDialog(
-      context: context,
-      builder: (context) {
-        return alert;
-      },
-    );
+    }).whenComplete(() => Util.closeLoadingDialogIfNotClosed(context));
   }
 }
 

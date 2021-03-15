@@ -53,6 +53,10 @@ class DownloadableLinksProvider extends ChangeNotifier {
     }
   }
 
+  void delete(DownloadableLink link) {
+    if (_links.remove(link)) notifyListeners();
+  }
+
   bool _removeComplete() {
     int size = _links.length;
     _links.removeWhere((element) => element.isComplete);
