@@ -15,21 +15,8 @@ import 'instd_api.dart';
 import 'util.dart';
 
 void main() {
-  runZonedGuarded(() {
-    WidgetsFlutterBinding.ensureInitialized();
-    FlutterError.onError = (FlutterErrorDetails errorDetails) {
-      print('This is an error on the Flutter SDK');
-      print(errorDetails.exception);
-      print('-----');
-      print(errorDetails.stack);
-    };
-    runApp(MyApp());
-  }, (error, stackTrace) {
-    print('This is a pure Dart error');
-    print(error);
-    print('-----');
-    print(stackTrace);
-  });
+  WidgetsFlutterBinding.ensureInitialized();
+  runApp(MyApp());
 }
 
 class MyApp extends StatelessWidget {
