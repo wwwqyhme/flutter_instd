@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -13,7 +15,21 @@ import 'instd_api.dart';
 import 'util.dart';
 
 void main() {
-  runApp(MyApp());
+  runZonedGuarded(() {
+    WidgetsFlutterBinding.ensureInitialized();
+    FlutterError.onError = (FlutterErrorDetails errorDetails) {
+      print('This is an error on the Flutter SDK');
+      print(errorDetails.exception);
+      print('-----');
+      print(errorDetails.stack);
+    };
+    runApp(MyApp());
+  }, (error, stackTrace) {
+    print('This is a pure Dart error');
+    print(error);
+    print('-----');
+    print(stackTrace);
+  });
 }
 
 class MyApp extends StatelessWidget {
@@ -41,7 +57,7 @@ class MyHomePage extends StatefulWidget {
 
 class _MyHomePageState extends State<MyHomePage> {
   var controller = TextEditingController();
-  String lastUrl;
+  ParsedUrl lastUrl;
   bool deleteAfterDownloadComplete = false;
 
   @override
@@ -61,7 +77,7 @@ class _MyHomePageState extends State<MyHomePage> {
           create: (context) => DownloadableLinksProvider(),
           child: Column(children: <Widget>[
             _ClipboardReadWidget((context, data) {
-              if (data != lastUrl) parse(context, data);
+              parse(context, data);
             }),
             Container(
               child: Padding(
@@ -124,26 +140,27 @@ class _MyHomePageState extends State<MyHomePage> {
       Util.alertError(context, '无效的地址');
       return;
     }
+    if (parsedUrl == lastUrl) return;
     Util.loadingDialog(context, message: '正在获取图片|视频...');
-    lastUrl = url;
     InstdApi().parse(url).then((value) {
+      lastUrl = parsedUrl;
       controller.text = '';
       Provider.of<DownloadableLinksProvider>(context, listen: false).add(value);
     }).catchError((e) {
       if (e is DioError) {
         Util.alertError(context, '网络异常');
       } else if (e is ResourceNotFoundException) {
-        Util.alertError(context, '帖子不存在');
+        Util.alertError(context, e.message);
       } else if (e is AuthenticationException) {
         Util.closeLoadingDialogIfNotClosed(context);
         Navigator.pushNamed(context, "login").then((value) {
           if (value != true)
             Util.alertError(context, '登录失败');
-          else if (lastUrl != null) parse(context, lastUrl);
+          else if (lastUrl != null) parse(context, lastUrl.url);
         });
       } else {
         Util.alertError(context, '系统异常');
-        debugPrint(e.toString());
+        print(e.stack);
       }
     }).whenComplete(() => Util.closeLoadingDialogIfNotClosed(context));
   }

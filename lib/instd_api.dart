@@ -7,6 +7,7 @@ import 'package:path/path.dart' as path;
 import 'package:webview_cookie_manager/webview_cookie_manager.dart';
 
 class InstdApi {
+  static const APP_ID = '1217981644879628';
   static const String USER_AGENT =
       "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/86.0.4240.75 Safari/537.36";
 
@@ -15,6 +16,7 @@ class InstdApi {
     if (_instance == null) {
       Dio dio = Dio(BaseOptions(headers: {
         HttpHeaders.userAgentHeader: USER_AGENT,
+        'x-ig-app-id': APP_ID
       }));
       dio.interceptors.add(_AuthenticationInterceptor());
       _instance = InstdApi._(dio);
@@ -40,7 +42,68 @@ class InstdApi {
     if (parsedUrl.type == 'post') {
       return _getPost(parsedUrl);
     }
+
+    if (parsedUrl.type == 'story') {
+      return _getStory(parsedUrl);
+    }
     return [];
+  }
+
+  Future<List<Link>> _getStory(ParsedUrl parsedUrl) async {
+    String username = parsedUrl.params[0];
+    String userId = await _getUserId(username);
+    String url =
+        'https://i.instagram.com/api/v1/feed/reels_media/?reel_ids=$userId';
+    Response<String> response = await _dio.get(url);
+    var jsonData = json.decode(response.data);
+    String status = jsonData['status'];
+    if (status != 'ok') throw Exception('stories解析失败:$response.data');
+    var userReel = jsonData['reels'][userId] ??
+        (throw ResourceNotFoundException('用户没有快拍'));
+    List items = userReel['items'];
+    List<Link> links = [];
+    for (Map item in items) {
+      links.add(_getBestLink(item));
+    }
+    return links;
+  }
+
+  Link _getBestLink(Map item) {
+    List images = _getImageVersions(item);
+    String thumbnail = images[images.length - 1]['url'];
+    for (String key in item.keys) {
+      if (key.startsWith('video_versions')) {
+        return Link(item[key][0]['url'], true, thumbnail);
+      }
+    }
+    return Link(images[0]['url'], false, thumbnail);
+  }
+
+  List _getImageVersions(Map item) {
+    for (String key in item.keys) {
+      if (key.startsWith('image_versions')) {
+        return item[key]['candidates'];
+      }
+    }
+    throw Exception('解析失败，没有符合条件的资源:$item');
+  }
+
+  Future<String> _getUserId(String username) async {
+    String url = 'https://www.instagram.com/$username/?__a=1';
+    Response<String> response;
+    try {
+      response = await _dio.get(url);
+    } on DioError catch (e) {
+      if (e.response != null && e.response.statusCode == 404)
+        throw ResourceNotFoundException('用户不存在');
+      rethrow;
+    }
+    String data = response.data;
+    if (_needLogin(data)) {
+      throw AuthenticationException();
+    }
+    var jsonData = json.decode(data);
+    return jsonData['graphql']['user']['id'];
   }
 
   Future<List<Link>> _getPost(ParsedUrl parsedUrl) async {
@@ -52,7 +115,7 @@ class InstdApi {
     } on DioError catch (e) {
       if (e.response == null) rethrow;
       if (e.response.statusCode == 404) {
-        throw ResourceNotFoundException(parsedUrl);
+        throw ResourceNotFoundException('帖子不存在');
       }
       rethrow;
     }
@@ -86,9 +149,16 @@ class InstdApi {
       if (index != -1) {
         path = path.substring(0, index);
       }
-      return ParsedUrl("post", [path]);
+      return ParsedUrl(url, "post", [path]);
     }
-
+    if (path.startsWith("/stories/")) {
+      path = path.substring(9);
+      int index = path.indexOf('/');
+      if (index != -1) {
+        path = path.substring(0, index);
+      }
+      return ParsedUrl(url, "story", [path]);
+    }
     return null;
   }
 
@@ -115,34 +185,39 @@ class InstdApi {
   }
 }
 
-class ParsedUrl {
+class ParsedUrl with EquatableMixin {
+  final String url;
   final String type;
   final List<String> params;
 
-  ParsedUrl(this.type, this.params);
+  ParsedUrl(this.url, this.type, this.params);
+
+  @override
+  List<Object> get props => [type, params];
 }
 
 class Link with EquatableMixin {
   final String url;
   final bool video;
   String thumbnailUrl;
+  get name => _getFileName();
 
   Link(this.url, this.video, this.thumbnailUrl);
 
-  String getFileName() {
+  String _getFileName() {
     String basename = path.basename(File(url).path);
     return basename.indexOf('?') > -1 ? basename.split('?')[0] : basename;
   }
 
   @override
-  List<Object> get props => [url];
+  List<Object> get props => [name];
 }
 
 class AuthenticationException implements Exception {}
 
 class ResourceNotFoundException implements Exception {
-  final ParsedUrl parsedUrl;
-  ResourceNotFoundException(this.parsedUrl);
+  final String message;
+  ResourceNotFoundException(this.message);
 }
 
 class _AuthenticationInterceptor extends Interceptor {

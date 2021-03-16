@@ -94,16 +94,15 @@ class DownloadableLink extends ChangeNotifier with EquatableMixin {
     this.isStart = true;
     notifyListeners();
     getTemporaryDirectory()
-        .then((dir) => InstdApi()
-                .download(link, dir.path + '/' + link.getFileName(),
-                    callback: (count, total) {
+        .then((dir) => InstdApi().download(link, dir.path + '/' + link.name,
+                callback: (count, total) {
               if (total != -1) {
                 if (!isStart) return;
                 this.percent = total == -1 ? -1 : 100 * count / total;
                 notifyListeners();
               }
             }, cancelToken: _cancelToken).then((value) {
-              ImageGallerySaver.saveFile(dir.path + '/' + link.getFileName());
+              ImageGallerySaver.saveFile(dir.path + '/' + link.name);
             }).then((value) {
               this.isComplete = true;
               this.isStart = false;
