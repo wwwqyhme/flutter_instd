@@ -31,10 +31,10 @@ dependencies:
   dio: ^3.0.10
   image_gallery_saver: ^1.6.8
   path_provider: ^2.0.1
-  permission_handler: ^5.1.0+2
+  permission_handler: ^6.1.0
   webview_flutter: ^2.0.1
   webview_cookie_manager: ^1.0.8
-  provider: ^4.3.3
+  provider: ^5.0.0
   equatable: ^2.0.0
 
 dev_dependencies:

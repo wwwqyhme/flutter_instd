@@ -191,7 +191,7 @@ class _ClipboardReadWidgetState extends State<_ClipboardReadWidget>
   @override
   void initState() {
     super.initState();
-    if (defaultTargetPlatform == TargetPlatform.android) {
+    if (Util.isAndroid) {
       const MethodChannel windowsFocusChangedChannel =
           const MethodChannel('plugins.flutter.io/windowFocusChangedListener');
       windowsFocusChangedChannel.setMethodCallHandler(_onMethodCall);
@@ -203,7 +203,7 @@ class _ClipboardReadWidgetState extends State<_ClipboardReadWidget>
   @override
   void dispose() {
     super.dispose();
-    if (defaultTargetPlatform != TargetPlatform.android) {
+    if (!Util.isAndroid) {
       WidgetsBinding.instance.removeObserver(this);
     }
   }

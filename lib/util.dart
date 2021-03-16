@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:permission_handler/permission_handler.dart';
 
@@ -101,6 +102,8 @@ class Util {
       return true;
     });
   }
+
+  static get isAndroid => defaultTargetPlatform == TargetPlatform.android;
 }
 
 class _ConfirmDialog {
